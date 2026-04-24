@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Workflow Builder</title>
+  <style>
+    :root { --primary:#0b74de; --bg:#f5f7fb; --card:#fff; --text:#111827; --text-muted:#6b7280; --border:#e5e7eb; --radius:10px; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; padding:20px; }
+    .wrap { max-width:900px; margin:0 auto; }
+    .card { background:var(--card); border-radius:var(--radius); padding:20px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,.08); border:1px solid var(--border); }
+    h2 { margin:0 0 14px; font-size:20px; font-weight:700; }
+    label { display:block; margin:10px 0 6px; font-weight:600; font-size:14px; }
+    input, select, textarea { width:100%; box-sizing:border-box; border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:14px; background:#fff; }
+    input:focus, select:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(11,116,222,0.15); }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    .row > div { flex:1; min-width:200px; }
+    .btns { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+    button { border:0; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600; font-size:14px; transition:0.15s; }
+    button:hover { transform:translateY(-1px); }
+    .primary { background:var(--primary); color:#fff; }
+    .secondary { background:transparent; color:var(--primary); border:1px solid var(--border); }
+    .muted { color:var(--text-muted); font-size:13px; margin-top:8px; }
+    .hidden { display:none !important; }
+    .step-input { margin-bottom:8px; }
+    .result-card { border:1px solid var(--border); border-radius:10px; padding:12px; background:#fff; margin-top:10px; }
+    .badge { display:inline-block; background:#eaf2ff; color:var(--primary); border-radius:99px; padding:2px 8px; font-size:12px; font-weight:600; }
+    #toast-container { position:fixed; bottom:20px; right:20px; z-index:999; display:flex; flex-direction:column; gap:8px; }
+    .toast { background:#fff; border:1px solid var(--border); padding:10px 14px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.1); font-size:14px; animation:in 0.2s ease; }
+    @keyframes in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    @media (max-width:600px) { .row { flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div class="wrap">
+    <div class="card" id="buildPanel">
+      <h2>📝 Build Workflow</h2>
+      <div style="background:#eef2ff; border:1px solid #c7d2fe; color:#1e3a8a; padding:10px; border-radius:8px; margin-bottom:12px; font-size:13px;">
+        Fill in the title, select document type, and add steps. Click Save to store in the <b>Workflows</b> sheet.
+      </div>
+      <div class="row">
+        <div>
+          <label for="workflow_id">Workflow ID</label>
+          <input id="workflow_id" placeholder="WF-20260424-1015" />
+        </div>
+        <div>
+          <label for="doc_type">Document Type</label>
+          <select id="doc_type">
+            <option value="">— Select Type —</option>
+            <option value="Workflow">Workflow</option>
+            <option value="Purchase">Purchase</option>
+            <option value="Contract">Contract</option>
+            <option value="Invoice">Invoice</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <label for="title">Title</label>
+      <input id="title" placeholder="e.g., Office Printer Purchase" />
+      <label>Workflow Steps</label>
+      <div id="stepsContainer" style="margin-top:6px"></div>
+      <div class="btns">
+        <button type="button" class="secondary" id="addStepBtn">+ Add Step</button>
+        <button type="button" class="secondary" id="removeStepBtn">- Remove Last</button>
+        <button type="button" class="primary" id="saveBtn">💾 Save to Workflows</button>
+      </div>
+      <div class="muted" id="buildStatus"></div>
+    </div>
+
+    <div class="card" id="searchPanel">
+      <h2>🔍 Saved Workflows</h2>
+      <div class="row">
+        <div style="flex:2">
+          <label>Search</label>
+          <input id="query" placeholder="Search by ID, title, or step..." />
+        </div>
+        <div>
+          <label>Type Filter</label>
+          <select id="fType">
+            <option value="">All</option>
+            <option value="Workflow">Workflow</option>
+            <option value="Purchase">Purchase</option>
+            <option value="Contract">Contract</option>
+            <option value="Invoice">Invoice</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="btns">
+        <button class="primary" type="button" id="searchBtn">Search</button>
+        <button class="secondary" type="button" id="clearSearchBtn">Clear</button>
+      </div>
+      <div class="muted" id="searchStatus"></div>
+      <div id="results"></div>
+    </div>
+
+    <div class="card" id="devPanel">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>🔐 Developer Access</h2>
+        <button class="secondary" id="openDevBtn">Open</button>
+      </div>
+      <div id="devAuth" class="hidden" style="margin-top:12px; padding:12px; background:#fafafa; border-radius:8px;">
+        <div class="row">
+          <div><label>User</label><input id="devUser" placeholder="developer" /></div>
+          <div><label>Password</label><input id="devPass" type="password" /></div>
+        </div>
+        <div class="btns">
+          <button class="primary" id="devUnlock">Unlock</button>
+          <button class="secondary" id="devCancel">Cancel</button>
+        </div>
+        <div class="muted" id="devStatus"></div>
+      </div>
+      <div id="devTools" class="hidden" style="margin-top:12px; padding:12px; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
+        <h3 style="margin:0 0 8px;">✅ Admin Mode</h3>
+        <p style="font-size:13px; margin-bottom:8px;">You can now manage system settings.</p>
+        <button class="secondary" id="devClear">Clear Local Drafts</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // REPLACE THIS URL WITH YOUR DEPLOYED APPS SCRIPT WEB APP URL
+    const API_URL = 'https://script.google.com/macros/s/AKfycbyC96HS__GfR-mqMRopMuLm2AqkZ4eNOC3Ia4V5DV4AExf8D0fpZL_lBGOtJ58B7DwJ6g/exec';
+    const DRAFT_KEY = 'wf_builder_draft_v1';
+    
+    const $ = id => document.getElementById(id);
+    const toast = (msg, type='success') => {
+      const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+      $('toast-container').appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    };
+    const esc = v => String(v||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+    const today = () => new Date().toISOString().split('T')[0];
+    const genId = () => `WF-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(new Date().getHours()).padStart(2,'0')}${String(new Date().getMinutes()).padStart(2,'0')}`;
+
+    function createStep(value='') {
+      const c = $('stepsContainer');
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.className = 'step-input'; inp.placeholder = `Step ${c.children.length + 1}`; inp.value = value;
+      c.appendChild(inp);
+      inp.addEventListener('input', debounceSave);
+    }
+    function getSteps() { return [...document.querySelectorAll('.step-input')].map(i => i.value.trim()).filter(Boolean); }
+    
+    $('addStepBtn').onclick = () => { createStep(); debounceSave(); };
+    $('removeStepBtn').onclick = () => {
+      const c = $('stepsContainer');
+      if (c.lastChild) { c.removeChild(c.lastChild); debounceSave(); }
+    };
+
+    let saveTimer;
+    function debounceSave() { clearTimeout(saveTimer); saveTimer = setTimeout(saveDraft, 500); }
+    function saveDraft() { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(getData())); } catch(e){} }
+    
+    function loadData() {
+      try {
+        const d = JSON.parse(localStorage.getItem(DRAFT_KEY));
+        if (d) {
+          $('title').value = d.title || '';
+          $('workflow_id').value = d.workflow_id || genId();
+          $('doc_type').value = d.doc_type || '';
+          const c = $('stepsContainer'); c.innerHTML = '';
+          (d.steps || ['']).forEach(s => createStep(s));
+          return;
+        }
+      } catch(e) {}
+      $('workflow_id').value = genId();
+      for(let i=0;i<3;i++) createStep();
+    }
+
+    function getData() {
+      return {
+        workflow_id: $('workflow_id').value.trim(),
+        title: $('title').value.trim(),
+        doc_type: $('doc_type').value,
+        date: today(),
+        steps: getSteps(),
+        summary: `Workflow: ${$('title').value}\nType: ${$('doc_type').value}\nSteps: ${getSteps().join(' → ')}\nCreated: ${today()}`
+      };
+    }
+
+    async function post(action, data) {
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: {'Content-Type':'text/plain;charset=utf-8'},
+          body: JSON.stringify({action, data})
+        });
+        return await res.json();
+      } catch(e) { throw new Error('Network error: ' + e.message); }
+    }
+
+    $('saveBtn').onclick = async () => {
+      const data = getData();
+      if (!data.title) { toast('Title required', 'error'); return; }
+      if (!data.doc_type) { toast('Document type required', 'error'); return; }
+      if (data.steps.length < 1) { toast('At least 1 step required', 'error'); return; }
+
+      $('saveBtn').disabled = true; $('saveBtn').textContent = 'Saving...';
+      try {
+        const res = await post('submit', data);
+        if (!res.success) throw new Error(res.error || 'Save failed');
+        toast('✅ Saved to Workflows sheet');
+        $('buildStatus').textContent = `ID: ${res.document_id} | Saved at ${new Date().toLocaleTimeString()}`;
+        clearForm();
+        runSearch();
+      } catch(e) { toast(e.message, 'error'); }
+      finally { $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 Save to Workflows'; }
+    };
+
+    function clearForm() {
+      $('title').value = ''; $('doc_type').value = '';
+      $('stepsContainer').innerHTML = ''; createStep(); createStep(); createStep();
+      $('buildStatus').textContent = '';
+      localStorage.removeItem(DRAFT_KEY);
+    }
+
+    async function runSearch() {
+      $('searchBtn').disabled = true; $('searchStatus').textContent = 'Loading...'; $('results').innerHTML = '';
+      try {
+        const res = await post('search', { query: $('query').value.trim(), filters: { doc_type: $('fType').value } });
+        if (!res.success) throw new Error(res.error);
+        $('searchStatus').textContent = res.total ? `${res.total} result(s)` : 'No results';
+        res.results.forEach(r => {
+          const card = document.createElement('div'); card.className = 'result-card';
+          card.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:start;">
+              <b>${esc(r.workflow_id)}</b><span class="badge">${esc(r.doc_type)}</span>
+            </div>
+            <div style="margin-top:4px;font-size:14px;">${esc(r.title)}</div>
+            <div style="margin-top:4px;font-size:12px;color:#666;">${esc(r.date)} • ${r.steps.length} step(s)</div>
+            <div style="margin-top:6px;font-size:13px;color:#333;background:#f8fafc;padding:6px;border-radius:6px;">
+              ${r.steps.map(s => `<div style="padding-left:10px;border-left:2px solid #e5e7eb;margin:2px 0;">${esc(s)}</div>`).join('')}
+            </div>`;
+          $('results').appendChild(card);
+        });
+      } catch(e) { $('searchStatus').textContent = e.message; }
+      finally { $('searchBtn').disabled = false; }
+    }
+    $('searchBtn').onclick = runSearch;
+    $('clearSearchBtn').onclick = () => { $('query').value=''; $('fType').value=''; runSearch(); };
+    $('query').onkeydown = e => e.key==='Enter' && runSearch();
+
+    $('openDevBtn').onclick = () => $('devAuth').classList.remove('hidden');
+    $('devCancel').onclick = () => $('devAuth').classList.add('hidden');
+    $('devUnlock').onclick = () => {
+      if ($('devUser').value.trim() === 'developer' && $('devPass').value === 'developer123') {
+        $('devAuth').classList.add('hidden'); $('devTools').classList.remove('hidden');
+        $('devStatus').textContent = ''; toast('🔓 Developer access granted');
+      } else { $('devStatus').textContent = '❌ Invalid credentials'; }
+    };
+    $('devClear').onclick = () => { localStorage.clear(); toast('🧹 Drafts cleared'); };
+
+    loadData(); runSearch();
+  </script>
+</body>
+</html>
